@@ -19,7 +19,6 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
   bool _accelerometerServiceRunning = false;
   String _accelerometerData = 'Esperando datos...';
   bool _shakeDetected = false;
-  bool _canDetectShake = true;
   final Map<String, String> _languages = {
     'Español': 'es-ES',
     'English': 'en-US',
@@ -110,34 +109,6 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
     } else {
       _voiceService.disableShakeToActivate();
     }
-  }
-
-  Future<void> _activateVoiceAssistant() async {
-    if (!_canDetectShake) return;
-
-    setState(() {
-      _canDetectShake = false;
-      _shakeDetected = true;
-    });
-
-    String activationMessage = _state.language.startsWith('es')
-        ? 'Hola, te estoy escuchando'
-        : 'Hello, I\'m listening to you';
-
-    await _voiceService.speakText(activationMessage, _state.language);
-
-    await Future.delayed(Duration(seconds: VoiceConfig.activationDelay));
-    await _startListening();
-
-    await Future.delayed(Duration(seconds: UIConfig.shakeIndicatorDuration));
-    setState(() {
-      _shakeDetected = false;
-    });
-
-    await Future.delayed(Duration(seconds: UIConfig.shakeIndicatorReset));
-    setState(() {
-      _canDetectShake = true;
-    });
   }
 
   void _startAccelerometerMonitoring() {

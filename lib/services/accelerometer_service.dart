@@ -4,7 +4,6 @@ import 'package:sensors_plus/sensors_plus.dart';
 import '../config/accelerometer_config.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_tts/flutter_tts.dart';
-import 'dart:isolate';
 
 // Clase para monitorear acelerómetro directamente
 class SimpleAccelerometerService {
@@ -244,8 +243,7 @@ class AccelerometerForegroundService {
     }
 
     // Start the foreground service
-    final ServiceRequestResult result =
-        await FlutterForegroundTask.startService(
+    await FlutterForegroundTask.startService(
       serviceId: 256,
       notificationTitle: 'IHC Smart Light Bulb',
       notificationText: 'Monitoring accelerometer in background...',
@@ -259,8 +257,7 @@ class AccelerometerForegroundService {
 
   // Detener el servicio en primer plano
   static Future<bool> stopService() async {
-    final ServiceRequestResult result =
-        await FlutterForegroundTask.stopService();
+    await FlutterForegroundTask.stopService();
     _isServiceRunning = false;
     print('🛑 Foreground service stopped');
     return !await FlutterForegroundTask.isRunningService;
