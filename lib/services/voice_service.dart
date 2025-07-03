@@ -34,8 +34,7 @@ class VoiceService {
       } else {
         _useSimpleService = true;
         await _simpleAccelerometerService.initialize();
-        bool simpleStarted =
-            await _simpleAccelerometerService.startSimpleTest(() {
+        await _simpleAccelerometerService.startSimpleTest(() {
           _activateVoiceAssistant();
         });
       }
