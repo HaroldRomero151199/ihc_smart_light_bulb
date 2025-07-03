@@ -38,6 +38,9 @@ dependencies:
   flutter_tts: ^4.2.3 # Para texto a voz
   permission_handler: ^12.0.0+1 # Para permisos
   provider: ^6.1.1
+  sensors_plus: ^6.1.1 # Para sensores del dispositivo
+  flutter_foreground_task: ^9.1.0 # Para servicios en primer plano
+  workmanager: ^0.6.0 # Para tareas en segundo plano
 
 dev_dependencies:
   flutter_test:
