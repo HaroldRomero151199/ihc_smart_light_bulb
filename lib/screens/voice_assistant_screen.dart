@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/voice_state.dart';
 import '../services/voice_service.dart';
+import '../services/global_accelerometer_service.dart';
+import '../config/accelerometer_config.dart';
+import 'dart:async';
 
 class VoiceAssistantScreen extends StatefulWidget {
   const VoiceAssistantScreen({super.key});
@@ -12,6 +15,11 @@ class VoiceAssistantScreen extends StatefulWidget {
 class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
   final VoiceService _voiceService = VoiceService();
   VoiceState _state = const VoiceState();
+  bool _shakeToActivate = true;
+  bool _accelerometerServiceRunning = false;
+  String _accelerometerData = 'Esperando datos...';
+  bool _shakeDetected = false;
+  bool _canDetectShake = true;
   final Map<String, String> _languages = {
     'Español': 'es-ES',
     'English': 'en-US',
@@ -21,11 +29,33 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
   void initState() {
     super.initState();
     _initializeVoiceService();
+    _checkAccelerometerService();
+    _startAccelerometerMonitoring();
   }
 
   Future<void> _initializeVoiceService() async {
     await _voiceService.initialize();
     await _voiceService.initializeTts(_state.language);
+    _voiceService.setShakeDetectedCallback(_showShakeDetected);
+    if (_shakeToActivate) {
+      _voiceService.enableShakeToActivate();
+    }
+  }
+
+  Future<void> _checkAccelerometerService() async {
+    bool isRunning = GlobalAccelerometerService.instance.isRunning();
+    setState(() {
+      _accelerometerServiceRunning = isRunning;
+    });
+
+    Timer.periodic(Duration(seconds: UIConfig.serviceCheckInterval), (timer) {
+      bool currentStatus = GlobalAccelerometerService.instance.isRunning();
+      if (currentStatus != _accelerometerServiceRunning) {
+        setState(() {
+          _accelerometerServiceRunning = currentStatus;
+        });
+      }
+    });
   }
 
   Future<void> _startListening() async {
@@ -55,7 +85,6 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
   }
 
   Future<void> _processText(String text) async {
-    // Por ahora solo repetimos el texto
     setState(() {
       _state = _state.copyWith(processedText: text);
     });
@@ -71,82 +100,250 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Asistente de Voz'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                const Text('Idioma: ',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(width: 8),
-                DropdownButton<String>(
-                  value: _state.language,
-                  items: _languages.entries
-                      .map((entry) => DropdownMenuItem<String>(
-                            value: entry.value,
-                            child: Text(entry.key),
-                          ))
-                      .toList(),
-                  onChanged: _onLanguageChanged,
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _buildTextCard(
-              title: 'Texto Reconocido:',
-              text: _state.recognizedText.isEmpty
-                  ? 'No hay texto'
-                  : _state.recognizedText,
-            ),
-            const SizedBox(height: 16),
-            _buildTextCard(
-              title: 'Texto Procesado:',
-              text: _state.processedText.isEmpty
-                  ? 'No hay texto procesado'
-                  : _state.processedText,
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _state.isListening ? _stopListening : _startListening,
-        tooltip: _state.isListening ? 'Detener' : 'Escuchar',
-        child: Icon(_state.isListening ? Icons.mic_off : Icons.mic),
-      ),
-    );
+  void _onShakeToActivateChanged(bool value) {
+    setState(() {
+      _shakeToActivate = value;
+    });
+
+    if (value) {
+      _voiceService.enableShakeToActivate();
+    } else {
+      _voiceService.disableShakeToActivate();
+    }
   }
 
-  Widget _buildTextCard({required String title, required String text}) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(text),
-          ],
-        ),
+  Future<void> _activateVoiceAssistant() async {
+    if (!_canDetectShake) return;
+
+    setState(() {
+      _canDetectShake = false;
+      _shakeDetected = true;
+    });
+
+    String activationMessage = _state.language.startsWith('es')
+        ? 'Hola, te estoy escuchando'
+        : 'Hello, I\'m listening to you';
+
+    await _voiceService.speakText(activationMessage, _state.language);
+
+    await Future.delayed(Duration(seconds: VoiceConfig.activationDelay));
+    await _startListening();
+
+    await Future.delayed(Duration(seconds: UIConfig.shakeIndicatorDuration));
+    setState(() {
+      _shakeDetected = false;
+    });
+
+    await Future.delayed(Duration(seconds: UIConfig.shakeIndicatorReset));
+    setState(() {
+      _canDetectShake = true;
+    });
+  }
+
+  void _startAccelerometerMonitoring() {
+    Timer.periodic(Duration(seconds: UIConfig.statusUpdateInterval), (timer) {
+      _updateAccelerometerData();
+    });
+  }
+
+  void _updateAccelerometerData() {
+    String status =
+        _accelerometerServiceRunning ? '✅ Activo (Global)' : '❌ Inactivo';
+
+    setState(() {
+      _accelerometerData =
+          'Sensor de acelerómetro: $status - ${DateTime.now().toString().substring(11, 19)}';
+    });
+  }
+
+  void _showShakeDetected() {
+    setState(() {
+      _shakeDetected = true;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('¡Agitación detectada! Activando asistente...'),
+        backgroundColor: Colors.green,
+        duration: Duration(seconds: UIConfig.snackbarDuration),
       ),
     );
+
+    Future.delayed(Duration(seconds: UIConfig.shakeIndicatorDuration), () {
+      if (mounted) {
+        setState(() {
+          _shakeDetected = false;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
-    _voiceService.dispose();
     super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+        appBar: AppBar(
+          title: const Text('Asistente de Voz'),
+          backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        ),
+        body: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  const Text('Idioma: ',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 8),
+                  DropdownButton<String>(
+                    value: _languages.entries
+                        .firstWhere((entry) => entry.value == _state.language)
+                        .key,
+                    items: _languages.keys.map((String language) {
+                      return DropdownMenuItem<String>(
+                        value: language,
+                        child: Text(language),
+                      );
+                    }).toList(),
+                    onChanged: (String? newValue) {
+                      if (newValue != null) {
+                        _onLanguageChanged(_languages[newValue]);
+                      }
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              SwitchListTile(
+                title: const Text('Activar por agitación'),
+                value: _shakeToActivate,
+                onChanged: _onShakeToActivateChanged,
+              ),
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      Text(
+                        'Estado del Sensor',
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(_accelerometerData),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Icon(
+                            _accelerometerServiceRunning
+                                ? Icons.check_circle
+                                : Icons.error,
+                            color: _accelerometerServiceRunning
+                                ? Colors.green
+                                : Colors.red,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _accelerometerServiceRunning
+                                ? 'Activo'
+                                : 'Inactivo',
+                            style: TextStyle(
+                              color: _accelerometerServiceRunning
+                                  ? Colors.green
+                                  : Colors.red,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (_shakeDetected)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.waves, color: Colors.green),
+                      const SizedBox(width: 8),
+                      Text(
+                        '¡Agitación detectada!',
+                        style: TextStyle(
+                            color: Colors.green, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _state.isListening ? null : _startListening,
+                      child: Text(_state.isListening
+                          ? 'Escuchando...'
+                          : 'Iniciar Escucha'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _state.isListening ? _stopListening : null,
+                      child: const Text('Detener'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (_state.recognizedText.isNotEmpty)
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Texto Reconocido:',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(_state.recognizedText),
+                      ],
+                    ),
+                  ),
+                ),
+              if (_state.processedText.isNotEmpty)
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Respuesta:',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(_state.processedText),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+        ),
+      ),
+    );
   }
 }
