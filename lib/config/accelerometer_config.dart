@@ -32,8 +32,9 @@ class AccelerometerConfig {
 
 // Configuración para el servicio de voz
 class VoiceConfig {
-  static const int activationDelay = 2;
-  static const int listeningCooldown = 8;
+  static const int activationDelay = 2;           // 2 segundos antes de escuchar
+  static const int listeningDuration = 15;        // 15 SEGUNDOS PARA HABLAR
+  static const int listeningCooldown = 8;         // 8 segundos de pausa después
   static const int shakeDetectionCooldown = 10;
   static const int shakeCheckInterval = 500; // milisegundos
 }

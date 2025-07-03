@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'screens/voice_assistant_screen.dart';
 import 'services/accelerometer_service.dart';
 import 'services/voice_service.dart';
+import 'services/backend_service.dart';
 import 'config/app_lifecycle_config.dart';
 import 'config/accelerometer_config.dart';
 import 'dart:async';
@@ -23,6 +24,9 @@ void main() async {
 }
 
 Future<void> _initializeGlobalServices() async {
+  // Inicializar backend service
+  await _initializeBackendService();
+
   // Inicializar servicio de voz
   await _initializeVoiceService();
 
@@ -30,6 +34,11 @@ Future<void> _initializeGlobalServices() async {
   await _initializeAccelerometerService();
 
   print('=== SERVICIOS GLOBALES INICIALIZADOS ===');
+}
+
+Future<void> _initializeBackendService() async {
+  print('🌐 Inicializando servicio de backend...');
+  await BackendService.initialize();
 }
 
 Future<void> _initializeVoiceService() async {

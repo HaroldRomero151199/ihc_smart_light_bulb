@@ -30,6 +30,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  serverpod_flutter: 2.9.1 # Cliente para Serverpod
+  ihc_smart_light_client:
+    path: ../ihc_smart_light_client
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -41,6 +44,12 @@ dependencies:
   sensors_plus: ^6.1.1 # Para sensores del dispositivo
   flutter_foreground_task: ^9.1.0 # Para servicios en primer plano
   workmanager: ^0.6.0 # Para tareas en segundo plano
+  
+  # Backend communication
+  http: ^1.4.0 # Cliente HTTP
+  dio: ^5.6.0 # Cliente HTTP robusto con interceptors
+  json_annotation: ^4.9.0 # Para serialización JSON
+  shared_preferences_foundation: ^2.3.0 # Para Shared Preferences
 
 dev_dependencies:
   flutter_test:
@@ -53,6 +62,8 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.13.1
+  build_runner: ^2.4.11 # Para generación de código JSON
+  json_serializable: ^6.8.0 # Para serialización JSON
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
